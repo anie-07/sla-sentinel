@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SLA Sentinel — Predictive Incident Intelligence</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --navy:#0B1A2F; --navy2:#0D2240; --teal:#0D9488; --teal-lt:#CCFBF1;
+  --gold:#F59E0B; --red:#EF4444; --green:#16A34A; --slate:#64748B;
+  --dark:#1E293B; --white:#FFFFFF; --border:#1E3A5F;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--navy);color:var(--white);font-family:'Segoe UI',Calibri,sans-serif;min-height:100vh;}
+header{background:var(--navy2);border-bottom:2px solid var(--teal);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+.logo-badge{background:var(--teal);color:var(--white);font-weight:700;font-size:12px;padding:3px 9px;border-radius:4px;letter-spacing:1px;}
+.logo h1{font-size:18px;font-weight:700;margin-left:10px;display:inline;}
+.logo p{font-size:10px;color:var(--slate);margin-top:2px;}
+#clock{font-size:20px;font-weight:700;color:var(--gold);}
+#hdr-status{font-size:11px;font-weight:600;display:flex;align-items:center;gap:6px;}
+.sdot{width:9px;height:9px;border-radius:50%;animation:pulse 1.5s infinite;}
+.sdot-g{background:var(--green);} .sdot-y{background:var(--gold);} .sdot-r{background:var(--red);}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.35}}
+.ctrl{padding:10px 24px;background:var(--navy2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.btn{padding:7px 18px;border-radius:6px;border:none;font-size:12px;font-weight:600;cursor:pointer;transition:opacity .15s;}
+.btn:hover{opacity:.85;}
+.btn-p{background:var(--teal);color:var(--white);}
+.btn-o{background:transparent;color:var(--teal);border:1.5px solid var(--teal);}
+select{background:var(--navy);color:var(--white);border:1.5px solid var(--border);padding:5px 9px;border-radius:5px;font-size:11px;}
+.pbar{flex:1;height:5px;background:var(--border);border-radius:3px;min-width:100px;}
+.pfill{height:100%;border-radius:3px;background:var(--teal);transition:width .4s;}
+.scount{font-size:11px;color:var(--slate);white-space:nowrap;}
+.main{padding:16px 24px;display:grid;gap:14px;}
+.sys-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+.sys-card{background:var(--navy2);border:1.5px solid var(--border);border-radius:10px;padding:14px;transition:border-color .3s,box-shadow .3s;}
+.sys-card.warning{border-color:var(--gold);}
+.sys-card.critical{border-color:var(--red);box-shadow:0 0 12px rgba(239,68,68,.2);}
+.sys-card.resolved{border-color:var(--green);}
+.sys-name{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--slate);margin-bottom:8px;}
+.sys-badge{display:inline-block;font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;margin-bottom:8px;}
+.badge-normal{background:rgba(22,163,74,.15);color:var(--green);}
+.badge-warning{background:rgba(245,158,11,.15);color:var(--gold);}
+.badge-critical{background:rgba(239,68,68,.15);color:var(--red);}
+.badge-resolved{background:rgba(13,148,136,.15);color:var(--teal);}
+.sys-metric{font-size:11px;color:var(--slate);margin-bottom:3px;}
+.sys-metric span{font-weight:600;color:var(--white);}
+.conf-bar{height:4px;background:var(--border);border-radius:2px;margin-top:8px;}
+.conf-fill{height:100%;border-radius:2px;transition:width .4s,background .3s;}
+.incidents-section{display:grid;gap:10px;}
+.inc-card{background:var(--navy2);border-radius:10px;border:1.5px solid var(--border);padding:14px 16px;}
+.inc-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.inc-sys{font-size:13px;font-weight:700;}
+.inc-body{font-size:12px;color:var(--slate);line-height:1.6;margin-bottom:10px;}
+.inc-body strong{color:var(--white);}
+.btn-resolve{background:linear-gradient(135deg,var(--green),var(--teal));color:var(--white);font-size:12px;font-weight:700;padding:9px 20px;border-radius:7px;border:none;cursor:pointer;animation:glow 1.5s infinite;width:100%;}
+@keyframes glow{0%,100%{box-shadow:0 3px 12px rgba(13,148,136,.35)}50%{box-shadow:0 3px 22px rgba(13,148,136,.7)}}
+.btn-resolve:hover{opacity:.9;}
+.inc-resolved{font-size:12px;color:var(--green);font-weight:600;padding:8px 12px;background:rgba(22,163,74,.1);border-radius:6px;border:1px solid var(--green);}
+.bottom-row{display:grid;grid-template-columns:2fr 1fr;gap:14px;}
+.card{background:var(--navy2);border:1px solid var(--border);border-radius:10px;padding:14px;}
+.card-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--slate);margin-bottom:10px;}
+canvas{max-height:170px;}
+.cost-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
+.cost-item{text-align:center;padding:10px 8px;background:var(--navy);border-radius:7px;border:1px solid var(--border);}
+.cost-num{font-size:18px;font-weight:700;color:var(--gold);}
+.cost-lbl{font-size:9px;color:var(--slate);margin-top:2px;}
+#summary-panel{display:none;background:rgba(22,163,74,.1);border:2px solid var(--green);border-radius:10px;padding:16px;text-align:center;}
+.sum-title{font-size:18px;font-weight:700;color:var(--green);margin-bottom:6px;}
+.sum-sub{font-size:11px;color:var(--teal-lt);margin-bottom:12px;}
+.sum-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.sum-item{background:var(--navy2);border-radius:7px;padding:10px;border:1px solid var(--green);}
+.sum-num{font-size:20px;font-weight:700;color:var(--green);}
+.sum-lbl{font-size:9px;color:var(--slate);margin-top:2px;}
+.log-wrap{max-height:140px;overflow-y:auto;}
+#elog{list-style:none;font-size:11px;}
+#elog li{padding:5px 8px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:flex-start;}
+#elog li:last-child{border-bottom:none;}
+.lt{color:var(--slate);min-width:64px;}
+.lm{flex:1;}
+.lb{font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;white-space:nowrap;}
+footer{padding:8px 24px;text-align:center;font-size:10px;color:var(--slate);border-top:1px solid var(--border);}
+@media(max-width:768px){.sys-row{grid-template-columns:repeat(2,1fr);}.bottom-row{grid-template-columns:1fr;}.sum-grid{grid-template-columns:repeat(2,1fr);}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <span class="logo-badge">SLA SENTINEL</span>
+    <h1>Predictive Incident Intelligence</h1>
+    <p>Hotel-Specific Failure Signature Detection · Cognizant Bluebolt · AI for Hotels Hackathon 2026</p>
+  </div>
+  <div style="display:flex;align-items:center;gap:20px;">
+    <div id="hdr-status"><div class="sdot sdot-g" id="sdot"></div><span id="slbl" style="color:var(--green)">ALL SYSTEMS NORMAL</span></div>
+    <div id="clock">06:15 PM</div>
+  </div>
+</header>
+
+<div class="ctrl">
+  <button class="btn btn-p" id="btn-start" onclick="startDemo()">▶ Run Demo</button>
+  <button class="btn btn-o" id="btn-pause" onclick="pauseDemo()" disabled>⏸ Pause</button>
+  <button class="btn btn-o" onclick="resetDemo()">↺ Reset</button>
+  <span style="font-size:11px;color:var(--slate)">Speed:</span>
+  <select id="spd" onchange="updateSpeed()">
+    <option value="1200">Normal</option>
+    <option value="650" selected>Fast</option>
+    <option value="280">Very Fast</option>
+  </select>
+  <div class="pbar"><div class="pfill" id="pfill" style="width:0%"></div></div>
+  <span class="scount" id="scount">Step 0 / 50</span>
+</div>
+
+<div class="main">
+  <div class="sys-row">
+    <div class="sys-card" id="sc-pms">
+      <div class="sys-name">🖥 PMS — Property Mgmt</div>
+      <div><span class="sys-badge badge-normal" id="sb-pms">NORMAL</span></div>
+      <div class="sys-metric">Memory: <span id="pms-mem">45%</span></div>
+      <div class="sys-metric">Response: <span id="pms-resp">180ms</span></div>
+      <div class="sys-metric">Conn Pool: <span id="pms-pool">32%</span></div>
+      <div class="sys-metric">Error Rate: <span id="pms-err">0.4%</span></div>
+      <div class="conf-bar"><div class="conf-fill" id="cf-pms" style="width:38%;background:var(--green)"></div></div>
+      <div style="font-size:9px;color:var(--slate);margin-top:4px;">Confidence: <span id="cc-pms">38%</span></div>
+    </div>
+    <div class="sys-card" id="sc-wifi">
+      <div class="sys-name">📶 Wi-Fi — Network</div>
+      <div><span class="sys-badge badge-normal" id="sb-wifi">NORMAL</span></div>
+      <div class="sys-metric">Auth Latency: <span id="wifi-lat">120ms</span></div>
+      <div class="sys-metric">Packet Loss: <span id="wifi-loss">0.8%</span></div>
+      <div class="sys-metric">Floors Affected: <span id="wifi-floors">None</span></div>
+      <div class="sys-metric">&nbsp;</div>
+      <div class="conf-bar"><div class="conf-fill" id="cf-wifi" style="width:30%;background:var(--green)"></div></div>
+      <div style="font-size:9px;color:var(--slate);margin-top:4px;">Confidence: <span id="cc-wifi">30%</span></div>
+    </div>
+    <div class="sys-card" id="sc-pos">
+      <div class="sys-name">🍽 Restaurant POS</div>
+      <div><span class="sys-badge badge-normal" id="sb-pos">NORMAL</span></div>
+      <div class="sys-metric">Response: <span id="pos-resp">200ms</span></div>
+      <div class="sys-metric">Queue Depth: <span id="pos-queue">5</span></div>
+      <div class="sys-metric">Guests Waiting: <span id="pos-guests">0</span></div>
+      <div class="sys-metric">&nbsp;</div>
+      <div class="conf-bar"><div class="conf-fill" id="cf-pos" style="width:32%;background:var(--green)"></div></div>
+      <div style="font-size:9px;color:var(--slate);margin-top:4px;">Confidence: <span id="cc-pos">32%</span></div>
+    </div>
+    <div class="sys-card" id="sc-hvac">
+      <div class="sys-name">❄️ HVAC — IoT Controls</div>
+      <div><span class="sys-badge badge-normal" id="sb-hvac">NORMAL</span></div>
+      <div class="sys-metric">Cmd Response: <span id="hvac-resp">150ms</span></div>
+      <div class="sys-metric">Error Rate: <span id="hvac-err">0.2%</span></div>
+      <div class="sys-metric">Rooms Affected: <span id="hvac-rooms">0</span></div>
+      <div class="sys-metric">&nbsp;</div>
+      <div class="conf-bar"><div class="conf-fill" id="cf-hvac" style="width:28%;background:var(--green)"></div></div>
+      <div style="font-size:9px;color:var(--slate);margin-top:4px;">Confidence: <span id="cc-hvac">28%</span></div>
+    </div>
+  </div>
+
+  <div class="incidents-section" id="incidents-section" style="display:none;">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--slate);">🔔 Active Incidents — Guest Impact Alerts</div>
+    <div id="incidents-list"></div>
+  </div>
+
+  <div id="summary-panel">
+    <div class="sum-title">✅ ALL INCIDENTS RESOLVED — Hotel Systems Stable</div>
+    <div class="sum-sub">SLA Sentinel detected and prevented 4 system failures tonight. Zero guests impacted across all incidents.</div>
+    <div class="sum-grid">
+      <div class="sum-item"><div class="sum-num" id="sum-rev">₹0</div><div class="sum-lbl">Total Revenue Saved</div></div>
+      <div class="sum-item"><div class="sum-num" style="color:var(--teal)" id="sum-inc">4</div><div class="sum-lbl">Incidents Prevented</div></div>
+      <div class="sum-item"><div class="sum-num" style="color:var(--teal)">0</div><div class="sum-lbl">Guests Impacted</div></div>
+      <div class="sum-item"><div class="sum-num" style="color:var(--gold)">27 min</div><div class="sum-lbl">Avg Prediction Window</div></div>
+    </div>
+  </div>
+
+  <div class="bottom-row">
+    <div class="card">
+      <div class="card-title">All Systems — Live Confidence Scores</div>
+      <canvas id="chart-conf"></canvas>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:14px;">
+        <div class="card-title">💰 Cost of Downtime — Live</div>
+        <div class="cost-grid">
+          <div class="cost-item"><div class="cost-num" id="c-rev">₹0</div><div class="cost-lbl">Revenue at Risk</div></div>
+          <div class="cost-item"><div class="cost-num" id="c-inc" style="color:var(--red)">0</div><div class="cost-lbl">Active Incidents</div></div>
+          <div class="cost-item"><div class="cost-num" id="c-resolved" style="color:var(--green)">0</div><div class="cost-lbl">Resolved Tonight</div></div>
+          <div class="cost-item"><div class="cost-num" id="c-saved" style="color:var(--green)">₹0</div><div class="cost-lbl">Revenue Saved</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">📋 Event Log</div>
+        <div class="log-wrap"><ul id="elog"><li><span class="lt">06:15 PM</span><span class="lm">SLA Sentinel started. Monitoring 4 hotel systems.</span><span class="lb badge-normal">NORMAL</span></li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>SLA Sentinel MVP · Cognizant Bluebolt · AI for Hotels Hackathon 2026 · Theme 7 — Automation & Continuous Service Improvement</footer>
+
+<script>
+// ── TIMELINE GENERATOR (no Python needed) ───────────────────────────────────
+const TOTAL = 50;
+const BASE_HOUR = 18, BASE_MIN = 15;
+
+function ts(step) {
+  const total = BASE_HOUR * 60 + BASE_MIN + step;
+  const h = Math.floor(total / 60) % 12 || 12;
+  const m = String(total % 60).padStart(2, '0');
+  const ap = total < 12 * 60 ? 'AM' : 'PM';
+  return `${String(h).padStart(2,'0')}:${m} ${ap}`;
+}
+
+function rnd(mu, sigma, lo, hi) {
+  let v = mu + (Math.random() - 0.5) * sigma * 2;
+  if (lo !== undefined) v = Math.max(lo, v);
+  if (hi !== undefined) v = Math.min(hi, v);
+  return Math.round(v * 10) / 10;
+}
+
+function failT(step, start, peak) {
+  if (step < start) return 0;
+  if (step >= peak) return 1;
+  return (step - start) / (peak - start);
+}
+
+function generateTimeline() {
+  const tl = [];
+  // Failure windows: [start_step, peak_step]
+  const PMS  = [8,  20];
+  const WIFI = [3,  12];
+  const POS  = [25, 36];
+  const HVAC = [38, 48];
+
+  for (let i = 0; i < TOTAL; i++) {
+    const pt = failT(i, PMS[0], PMS[1]);
+    const wt = failT(i, WIFI[0], WIFI[1]);
+    const ot = failT(i, POS[0], POS[1]);
+    const ht = failT(i, HVAC[0], HVAC[1]);
+
+    const pms_mem  = rnd(45 + 45 * pt, 2, 10, 98);
+    const pms_resp = rnd(180 + 430 * Math.pow(pt, 1.4), 10, 80, 800);
+    const pms_pool = rnd(32 + 64 * Math.pow(pt, 1.2), 3, 5, 98);
+    const pms_err  = rnd(0.4 + 13 * pt * pt, 0.2, 0, 20);
+    const pms_conf = Math.min(99, Math.floor(38 + 61 * Math.pow(pt, 1.2)));
+    const pms_status = pms_conf >= 78 ? 'CRITICAL' : pms_conf >= 48 ? 'WARNING' : 'NORMAL';
+
+    const wifi_lat  = rnd(120 + 280 * Math.pow(wt, 1.3), 8, 60, 600);
+    const wifi_loss = rnd(0.8 + 18 * wt * wt, 0.2, 0, 30);
+    const wifi_conf = Math.min(99, Math.floor(30 + 69 * Math.pow(wt, 1.1)));
+    const wifi_status = wifi_conf >= 78 ? 'CRITICAL' : wifi_conf >= 45 ? 'WARNING' : 'NORMAL';
+
+    const pos_resp  = rnd(200 + 500 * Math.pow(ot, 1.5), 15, 80, 900);
+    const pos_queue = rnd(5 + 55 * Math.pow(ot, 1.3), 2, 0, 80);
+    const pos_conf  = Math.min(99, Math.floor(32 + 67 * Math.pow(ot, 1.2)));
+    const pos_status = pos_conf >= 78 ? 'CRITICAL' : pos_conf >= 45 ? 'WARNING' : 'NORMAL';
+
+    const hvac_resp = rnd(150 + 450 * Math.pow(ht, 1.4), 10, 50, 800);
+    const hvac_err  = rnd(0.2 + 15 * ht * ht, 0.2, 0, 25);
+    const hvac_conf = Math.min(99, Math.floor(28 + 71 * Math.pow(ht, 1.2)));
+    const hvac_status = hvac_conf >= 78 ? 'CRITICAL' : hvac_conf >= 45 ? 'WARNING' : 'NORMAL';
+
+    const statuses = [pms_status, wifi_status, pos_status, hvac_status];
+    const overall = statuses.includes('CRITICAL') ? 'CRITICAL' : statuses.includes('WARNING') ? 'WARNING' : 'NORMAL';
+
+    const incidents = [];
+    if (pms_status !== 'NORMAL') incidents.push({
+      system:'PMS', status:pms_status, confidence:pms_conf, key:'pms',
+      message:`PMS connection pool at ${pms_pool}%, memory ${pms_mem}%, response ${pms_resp}ms`,
+      action:'Restart PMS connection pool on Server 3',
+      guest_impact:'12 check-ins at risk',
+      revenue: Math.round(pms_conf / 99 * 221786)
+    });
+    if (wifi_status !== 'NORMAL') incidents.push({
+      system:'Wi-Fi', status:wifi_status, confidence:wifi_conf, key:'wifi',
+      message:`Wi-Fi auth latency ${wifi_lat}ms, packet loss ${wifi_loss}%`,
+      action:'Restart Wi-Fi authentication service on AP Controller',
+      guest_impact:'Guests on floors 3-6 losing connectivity',
+      revenue: Math.round(wifi_conf / 99 * 85000)
+    });
+    if (pos_status !== 'NORMAL') incidents.push({
+      system:'Restaurant POS', status:pos_status, confidence:pos_conf, key:'pos',
+      message:`POS response ${pos_resp}ms, queue depth ${pos_queue} transactions`,
+      action:'Clear POS transaction queue and restart billing service',
+      guest_impact:'40 restaurant guests cannot be billed',
+      revenue: Math.round(pos_conf / 99 * 95000)
+    });
+    if (hvac_status !== 'NORMAL') incidents.push({
+      system:'HVAC / IoT', status:hvac_status, confidence:hvac_conf, key:'hvac',
+      message:`HVAC command response ${hvac_resp}ms, error rate ${hvac_err}%`,
+      action:'Restart IoT gateway service on Hub 2',
+      guest_impact:'24 rooms reporting temperature control failure',
+      revenue: Math.round(hvac_conf / 99 * 62000)
+    });
+
+    tl.push({
+      step:i, timestamp:ts(i), overall_status:overall,
+      pms_memory:pms_mem, pms_response:pms_resp, pms_pool:pms_pool, pms_error:pms_err,
+      pms_conf:pms_conf, pms_status:pms_status,
+      wifi_latency:wifi_lat, wifi_loss:wifi_loss, wifi_conf:wifi_conf, wifi_status:wifi_status,
+      pos_response:pos_resp, pos_queue:pos_queue, pos_conf:pos_conf, pos_status:pos_status,
+      hvac_response:hvac_resp, hvac_error:hvac_err, hvac_conf:hvac_conf, hvac_status:hvac_status,
+      incidents:incidents,
+      total_revenue_at_risk: incidents.reduce((s,i) => s+i.revenue, 0)
+    });
+  }
+  return tl;
+}
+
+// ── STATE ────────────────────────────────────────────────────────────────────
+const timeline = generateTimeline();
+let step = -1, timer = null, speed = 650, running = false;
+let resolved = {pms:false, wifi:false, pos:false, hvac:false};
+let resolvedRevenue = 0, resolvedCount = 0;
+let activeIncidents = {};
+
+// ── CHART ─────────────────────────────────────────────────────────────────────
+const confChart = new Chart(document.getElementById('chart-conf'), {
+  type:'line',
+  data:{labels:[], datasets:[
+    {label:'PMS', data:[], borderColor:'#0D9488', tension:.4, pointRadius:2, fill:false},
+    {label:'Wi-Fi', data:[], borderColor:'#F59E0B', tension:.4, pointRadius:2, fill:false},
+    {label:'POS', data:[], borderColor:'#EF4444', tension:.4, pointRadius:2, fill:false},
+    {label:'HVAC', data:[], borderColor:'#7C3AED', tension:.4, pointRadius:2, fill:false},
+  ]},
+  options:{responsive:true, maintainAspectRatio:true, animation:{duration:200},
+    plugins:{legend:{labels:{color:'#64748B', font:{size:9}}}},
+    scales:{
+      x:{ticks:{color:'#64748B', font:{size:8}, maxTicksLimit:8}, grid:{color:'#1E3A5F'}},
+      y:{ticks:{color:'#64748B', font:{size:8}}, grid:{color:'#1E3A5F'}, min:0, max:100}
+    }}
+});
+
+// ── HELPERS ──────────────────────────────────────────────────────────────────
+function statusColor(s){return s==='CRITICAL'?'var(--red)':s==='WARNING'?'var(--gold)':'var(--green)';}
+function badgeClass(s){return s==='CRITICAL'?'badge-critical':s==='WARNING'?'badge-warning':'badge-normal';}
+function cardClass(s){return s==='CRITICAL'?'critical':s==='WARNING'?'warning':'';}
+
+function updateSysCard(key, status, conf, d) {
+  const card = document.getElementById('sc-'+key);
+  card.className = 'sys-card ' + (resolved[key] ? 'resolved' : cardClass(status));
+  const badge = document.getElementById('sb-'+key);
+  badge.className = 'sys-badge ' + (resolved[key] ? 'badge-resolved' : badgeClass(status));
+  badge.textContent = resolved[key] ? 'RESOLVED' : status;
+  const fill = document.getElementById('cf-'+key);
+  fill.style.width = (resolved[key] ? 5 : conf) + '%';
+  fill.style.background = resolved[key] ? 'var(--teal)' : statusColor(status);
+  document.getElementById('cc-'+key).textContent = (resolved[key] ? 5 : conf) + '%';
+
+  if (key === 'pms') {
+    if (resolved[key]) {
+      document.getElementById('pms-mem').textContent = '44%';
+      document.getElementById('pms-resp').textContent = '182ms';
+      document.getElementById('pms-pool').textContent = '33%';
+      document.getElementById('pms-err').textContent = '0.4%';
+    } else {
+      document.getElementById('pms-mem').textContent = d.pms_memory + '%';
+      document.getElementById('pms-resp').textContent = d.pms_response + 'ms';
+      document.getElementById('pms-pool').textContent = d.pms_pool + '%';
+      document.getElementById('pms-err').textContent = d.pms_error + '%';
+    }
+  } else if (key === 'wifi') {
+    if (resolved[key]) {
+      document.getElementById('wifi-lat').textContent = '118ms';
+      document.getElementById('wifi-loss').textContent = '0.7%';
+      document.getElementById('wifi-floors').textContent = 'None';
+    } else {
+      document.getElementById('wifi-lat').textContent = d.wifi_latency + 'ms';
+      document.getElementById('wifi-loss').textContent = d.wifi_loss + '%';
+      document.getElementById('wifi-floors').textContent = status !== 'NORMAL' ? '3, 4, 5, 6' : 'None';
+    }
+  } else if (key === 'pos') {
+    if (resolved[key]) {
+      document.getElementById('pos-resp').textContent = '195ms';
+      document.getElementById('pos-queue').textContent = '4';
+      document.getElementById('pos-guests').textContent = '0';
+    } else {
+      document.getElementById('pos-resp').textContent = d.pos_response + 'ms';
+      document.getElementById('pos-queue').textContent = d.pos_queue;
+      document.getElementById('pos-guests').textContent = status !== 'NORMAL' ? Math.round(d.pos_queue * 0.7) : 0;
+    }
+  } else if (key === 'hvac') {
+    if (resolved[key]) {
+      document.getElementById('hvac-resp').textContent = '148ms';
+      document.getElementById('hvac-err').textContent = '0.2%';
+      document.getElementById('hvac-rooms').textContent = '0';
+    } else {
+      document.getElementById('hvac-resp').textContent = d.hvac_response + 'ms';
+      document.getElementById('hvac-err').textContent = d.hvac_error + '%';
+      document.getElementById('hvac-rooms').textContent = status !== 'NORMAL' ? Math.round(d.hvac_conf / 99 * 24) : 0;
+    }
+  }
+}
+
+function updateIncidents(incidents) {
+  const section = document.getElementById('incidents-section');
+  const list = document.getElementById('incidents-list');
+  if (incidents.length === 0 && Object.keys(activeIncidents).length === 0) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  incidents.forEach(inc => {
+    if (!activeIncidents[inc.key] && !resolved[inc.key]) {
+      activeIncidents[inc.key] = inc;
+      const div = document.createElement('div');
+      div.className = 'inc-card';
+      div.id = 'inc-' + inc.key;
+      const col = inc.status === 'CRITICAL' ? 'var(--red)' : 'var(--gold)';
+      div.style.borderColor = col;
+      div.innerHTML = `
+        <div class="inc-header">
+          <span class="inc-sys" style="color:${col}">⚠️ ${inc.system} — ${inc.status}</span>
+          <span style="font-size:11px;color:${col};font-weight:700;">${inc.confidence}% confidence</span>
+        </div>
+        <div class="inc-body">
+          <strong>Signal:</strong> ${inc.message}<br>
+          <strong>Guest Impact:</strong> ${inc.guest_impact}<br>
+          <strong>Revenue at Risk:</strong> ₹${inc.revenue.toLocaleString('en-IN')}<br>
+          <strong>Recommended Action:</strong> ${inc.action}
+        </div>
+        <button class="btn-resolve" onclick="resolveInc('${inc.key}')">✅ TAKE ACTION — ${inc.action}</button>
+        <div class="inc-resolved" id="res-${inc.key}" style="display:none;">✅ Resolved — System stabilised. Zero guests impacted.</div>`;
+      list.appendChild(div);
+      addLog(inc.timestamp || '', `${inc.system} ${inc.status}: ${inc.message}. Guest impact: ${inc.guest_impact}.`,
+        inc.status === 'CRITICAL' ? 'badge-critical' : 'badge-warning');
+    } else if (activeIncidents[inc.key] && !resolved[inc.key]) {
+      const card = document.getElementById('inc-' + inc.key);
+      if (card && inc.status === 'CRITICAL') {
+        card.style.borderColor = 'var(--red)';
+        const hdr = card.querySelector('.inc-sys');
+        if (hdr) { hdr.style.color = 'var(--red)'; hdr.textContent = `⚠️ ${inc.system} — CRITICAL`; }
+      }
+    }
+  });
+}
+
+function resolveInc(key) {
+  resolved[key] = true;
+  const inc = activeIncidents[key];
+  if (inc) {
+    resolvedRevenue += inc.revenue;
+    resolvedCount++;
+    document.getElementById('c-saved').textContent = '₹' + resolvedRevenue.toLocaleString('en-IN');
+    document.getElementById('c-resolved').textContent = resolvedCount;
+  }
+  const card = document.getElementById('inc-' + key);
+  if (card) {
+    card.style.borderColor = 'var(--green)';
+    const btn = card.querySelector('.btn-resolve');
+    const res = document.getElementById('res-' + key);
+    if (btn) btn.style.display = 'none';
+    if (res) res.style.display = 'block';
+  }
+  updateSysCard(key, 'NORMAL', 5, timeline[step] || {});
+  addLog(timeline[step]?.timestamp || '', `✅ ${key.toUpperCase()} RESOLVED. System stable. Revenue protected: ₹${inc?.revenue.toLocaleString('en-IN') || 0}.`, 'badge-normal');
+  if (Object.values(resolved).every(v => v)) setTimeout(showSummary, 800);
+}
+
+function showSummary() {
+  document.getElementById('summary-panel').style.display = 'block';
+  document.getElementById('sum-rev').textContent = '₹' + resolvedRevenue.toLocaleString('en-IN');
+  document.getElementById('sum-inc').textContent = resolvedCount;
+  updateHeaderStatus('RESOLVED');
+}
+
+function updateHeaderStatus(overall) {
+  const dot = document.getElementById('sdot');
+  const lbl = document.getElementById('slbl');
+  dot.className = 'sdot';
+  if (overall === 'CRITICAL') { dot.classList.add('sdot-r'); lbl.textContent = '⚠️ CRITICAL — MULTIPLE FAILURES DETECTED'; lbl.style.color = 'var(--red)'; }
+  else if (overall === 'WARNING') { dot.classList.add('sdot-y'); lbl.textContent = '⚡ WARNING — ANOMALY DETECTED'; lbl.style.color = 'var(--gold)'; }
+  else if (overall === 'RESOLVED') { dot.classList.add('sdot-g'); lbl.textContent = '✅ ALL INCIDENTS RESOLVED — SYSTEMS STABLE'; lbl.style.color = 'var(--green)'; }
+  else { dot.classList.add('sdot-g'); lbl.textContent = 'ALL SYSTEMS NORMAL'; lbl.style.color = 'var(--green)'; }
+}
+
+function addLog(time, msg, cls) {
+  const log = document.getElementById('elog');
+  const li = document.createElement('li');
+  li.innerHTML = `<span class="lt">${time}</span><span class="lm">${msg}</span><span class="lb ${cls}">${cls.replace('badge-','').toUpperCase()}</span>`;
+  log.insertBefore(li, log.firstChild);
+}
+
+function updateChart(d) {
+  confChart.data.labels.push(d.timestamp);
+  confChart.data.datasets[0].data.push(d.pms_conf);
+  confChart.data.datasets[1].data.push(d.wifi_conf);
+  confChart.data.datasets[2].data.push(d.pos_conf);
+  confChart.data.datasets[3].data.push(d.hvac_conf);
+  confChart.update('none');
+}
+
+function tick() {
+  step++;
+  if (step >= timeline.length) { stopDemo(); return; }
+  const d = timeline[step];
+  document.getElementById('clock').textContent = d.timestamp;
+  document.getElementById('pfill').style.width = ((step+1)/TOTAL*100) + '%';
+  document.getElementById('scount').textContent = `Step ${step+1} / ${TOTAL}`;
+  if (!resolved.pms)  updateSysCard('pms',  d.pms_status,  d.pms_conf,  d);
+  if (!resolved.wifi) updateSysCard('wifi', d.wifi_status, d.wifi_conf, d);
+  if (!resolved.pos)  updateSysCard('pos',  d.pos_status,  d.pos_conf,  d);
+  if (!resolved.hvac) updateSysCard('hvac', d.hvac_status, d.hvac_conf, d);
+  if (!Object.values(resolved).every(v=>v)) updateHeaderStatus(d.overall_status);
+  updateIncidents(d.incidents);
+  const activeRev = d.incidents.filter(i => !resolved[i.key]).reduce((s,i) => s+i.revenue, 0);
+  document.getElementById('c-rev').textContent = '₹' + activeRev.toLocaleString('en-IN');
+  document.getElementById('c-inc').textContent = d.incidents.filter(i => !resolved[i.key]).length;
+  updateChart(d);
+}
+
+function startDemo() {
+  if (running) return;
+  if (step >= timeline.length - 1) resetDemo();
+  running = true;
+  document.getElementById('btn-start').disabled = true;
+  document.getElementById('btn-pause').disabled = false;
+  timer = setInterval(tick, speed);
+}
+
+function pauseDemo() {
+  if (!running) return;
+  running = false;
+  clearInterval(timer);
+  document.getElementById('btn-start').disabled = false;
+  document.getElementById('btn-pause').disabled = true;
+}
+
+function stopDemo() {
+  running = false;
+  clearInterval(timer);
+  document.getElementById('btn-start').disabled = false;
+  document.getElementById('btn-pause').disabled = true;
+}
+
+function resetDemo() {
+  stopDemo();
+  step = -1;
+  resolved = {pms:false, wifi:false, pos:false, hvac:false};
+  resolvedRevenue = 0; resolvedCount = 0; activeIncidents = {};
+  confChart.data.labels = [];
+  confChart.data.datasets.forEach(ds => ds.data = []);
+  confChart.update();
+  document.getElementById('incidents-section').style.display = 'none';
+  document.getElementById('incidents-list').innerHTML = '';
+  document.getElementById('summary-panel').style.display = 'none';
+  document.getElementById('c-rev').textContent = '₹0';
+  document.getElementById('c-inc').textContent = '0';
+  document.getElementById('c-resolved').textContent = '0';
+  document.getElementById('c-saved').textContent = '₹0';
+  document.getElementById('pfill').style.width = '0%';
+  document.getElementById('scount').textContent = 'Step 0 / 50';
+  document.getElementById('clock').textContent = '06:15 PM';
+  document.getElementById('elog').innerHTML = '<li><span class="lt">06:15 PM</span><span class="lm">SLA Sentinel started. Monitoring 4 hotel systems.</span><span class="lb badge-normal">NORMAL</span></li>';
+  ['pms','wifi','pos','hvac'].forEach(k => {
+    document.getElementById('sc-'+k).className = 'sys-card';
+    document.getElementById('sb-'+k).className = 'sys-badge badge-normal';
+    document.getElementById('sb-'+k).textContent = 'NORMAL';
+    document.getElementById('cf-'+k).style.width = '30%';
+    document.getElementById('cf-'+k).style.background = 'var(--green)';
+  });
+  updateHeaderStatus('NORMAL');
+  document.getElementById('btn-start').disabled = false;
+  document.getElementById('btn-pause').disabled = true;
+}
+
+function updateSpeed() {
+  speed = parseInt(document.getElementById('spd').value);
+  if (running) { clearInterval(timer); timer = setInterval(tick, speed); }
+}
+</script>
+</body>
+</html>
