@@ -93,7 +93,7 @@ footer{padding:8px 24px;text-align:center;font-size:10px;color:var(--slate);bord
   </div>
   <div style="display:flex;align-items:center;gap:20px;">
     <div id="hdr-status"><div class="sdot sdot-g" id="sdot"></div><span id="slbl" style="color:var(--green)">ALL SYSTEMS NORMAL</span></div>
-    <div id="clock">06:15 PM</div>
+    <div style="text-align:right"><div id="date-display" style="font-size:11px;color:var(--slate);margin-bottom:2px;"></div><div id="clock" id="clock"></div></div>
   </div>
 </header>
 
@@ -199,7 +199,9 @@ footer{padding:8px 24px;text-align:center;font-size:10px;color:var(--slate);bord
 <script>
 // ── TIMELINE GENERATOR (no Python needed) ───────────────────────────────────
 const TOTAL = 50;
-const BASE_HOUR = 18, BASE_MIN = 15;
+// BASE time will be set dynamically when demo starts
+let BASE_HOUR = new Date().getHours();
+let BASE_MIN = new Date().getMinutes();
 
 function ts(step) {
   const total = BASE_HOUR * 60 + BASE_MIN + step;
@@ -307,6 +309,51 @@ function generateTimeline() {
 
 // ── STATE ────────────────────────────────────────────────────────────────────
 const timeline = generateTimeline();
+
+// Show real date in header
+// ── LIVE CLOCK ───────────────────────────────────────────────────────────────
+let liveClock = null;
+
+function formatLiveTime(date) {
+  let h = date.getHours() % 12 || 12;
+  let m = String(date.getMinutes()).padStart(2, '0');
+  let s = String(date.getSeconds()).padStart(2, '0');
+  let ap = date.getHours() < 12 ? 'AM' : 'PM';
+  return `${String(h).padStart(2,'0')}:${m}:${s} ${ap}`;
+}
+
+function startLiveClock() {
+  if (liveClock) clearInterval(liveClock);
+  liveClock = setInterval(() => {
+    if (!running) {
+      document.getElementById('clock').textContent = formatLiveTime(new Date());
+    }
+  }, 1000);
+}
+
+function stopLiveClock() {
+  if (liveClock) clearInterval(liveClock);
+  liveClock = null;
+}
+
+function initDate() {
+  const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const now = new Date();
+  const dateStr = days[now.getDay()] + ", " + now.getDate() + " " + months[now.getMonth()] + " " + now.getFullYear();
+  document.getElementById("date-display").textContent = dateStr;
+  // Set clock to live current time immediately
+  document.getElementById("clock").textContent = formatLiveTime(now);
+  // Update event log with current time
+  const logEl = document.getElementById("elog");
+  if(logEl) {
+    const t = formatLiveTime(now);
+    logEl.innerHTML = `<li><span class="lt">${t}</span><span class="lm">SLA Sentinel started. Monitoring 4 hotel systems.</span><span class="lb badge-normal">NORMAL</span></li>`;
+  }
+  // Start live ticking
+  startLiveClock();
+}
+initDate();
 let step = -1, timer = null, speed = 650, running = false;
 let resolved = {pms:false, wifi:false, pos:false, hvac:false};
 let resolvedRevenue = 0, resolvedCount = 0;
@@ -507,7 +554,16 @@ function tick() {
 function startDemo() {
   if (running) return;
   if (step >= timeline.length - 1) resetDemo();
+  // Capture current real time as base when demo starts
+  const now = new Date();
+  BASE_HOUR = now.getHours();
+  BASE_MIN = now.getMinutes();
+  // Regenerate timeline with new base time
+  timeline.length = 0;
+  const newTl = generateTimeline();
+  newTl.forEach(t => timeline.push(t));
   running = true;
+  stopLiveClock();
   document.getElementById('btn-start').disabled = true;
   document.getElementById('btn-pause').disabled = false;
   timer = setInterval(tick, speed);
@@ -519,6 +575,7 @@ function pauseDemo() {
   clearInterval(timer);
   document.getElementById('btn-start').disabled = false;
   document.getElementById('btn-pause').disabled = true;
+  startLiveClock();
 }
 
 function stopDemo() {
@@ -526,6 +583,7 @@ function stopDemo() {
   clearInterval(timer);
   document.getElementById('btn-start').disabled = false;
   document.getElementById('btn-pause').disabled = true;
+  startLiveClock();
 }
 
 function resetDemo() {
@@ -546,7 +604,7 @@ function resetDemo() {
   document.getElementById('pfill').style.width = '0%';
   document.getElementById('scount').textContent = 'Step 0 / 50';
   document.getElementById('clock').textContent = '06:15 PM';
-  document.getElementById('elog').innerHTML = '<li><span class="lt">06:15 PM</span><span class="lm">SLA Sentinel started. Monitoring 4 hotel systems.</span><span class="lb badge-normal">NORMAL</span></li>';
+  document.getElementById('elog').innerHTML = `<li><span class="lt">${ts(0)}</span><span class="lm">SLA Sentinel started. Monitoring 4 hotel systems.</span><span class="lb badge-normal">NORMAL</span></li>`;
   ['pms','wifi','pos','hvac'].forEach(k => {
     document.getElementById('sc-'+k).className = 'sys-card';
     document.getElementById('sb-'+k).className = 'sys-badge badge-normal';
@@ -557,6 +615,16 @@ function resetDemo() {
   updateHeaderStatus('NORMAL');
   document.getElementById('btn-start').disabled = false;
   document.getElementById('btn-pause').disabled = true;
+  // Restart live clock on reset
+  document.getElementById('clock').textContent = formatLiveTime(new Date());
+  startLiveClock();
+  // Update date display
+  const days2 = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const months2 = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const now2 = new Date();
+  document.getElementById('date-display').textContent = days2[now2.getDay()] + ", " + now2.getDate() + " " + months2[now2.getMonth()] + " " + now2.getFullYear();
+  // Reset event log with current time
+  document.getElementById('elog').innerHTML = `<li><span class="lt">${formatLiveTime(new Date())}</span><span class="lm">SLA Sentinel started. Monitoring 4 hotel systems.</span><span class="lb badge-normal">NORMAL</span></li>`;
 }
 
 function updateSpeed() {
